@@ -7,26 +7,42 @@
   configfile,
 }: {
   name ? "rust-for-linux",
+  modulePath ? ".",
   extraConfig ? "",
   src ? null,
   ...
 }@args: let
   omitted = lib.filterAttrs (name: _: !builtins.elem name [ "name" "extraConfig" ]) args;
-in stdenv.mkDerivation {
+  prepare = stdenv.mkDerivation {
+    inherit buildInputs nativeBuildInputs;
+    name = "modules-parepare";
+    src = rust-linux;
+    fixupPhase = ":";
+    buildPhase = ''
+      patchShebangs ./scripts/check-local-export
+      cp ${configfile} .config
+      make -j16 LLVM=1
+    '';
+    installPhase = ''
+      mkdir -p $out
+      cp -r ./. $out
+    '';
+  };
+in stdenv.mkDerivation ({
   inherit buildInputs nativeBuildInputs name;
-  src = rust-linux;
+  src = prepare;
+  fixupPhase = ":";
   buildPhase = ''
-    patchShebangs ./scripts/check-local-export
+    mkdir -p ${modulePath}
     cp ${configfile.override { inherit extraConfig; }} .config
     ${if src == null then "" else ''
-      cp -rf ${src}/. .
+      cp -rf ${src}/. ${modulePath}
     ''}
-    make LLVM=1 -j16
+    make -j16 LLVM=1 modules_prepare
+    ${if modulePath == "." then ''
+      make -j16 LLVM=1 modules
+    '' else ''
+      make -j16 LLVM=1 M=${modulePath}
+    ''}
   '';
-  installPhase = ''
-    mkdir -p $out
-    export INSTALL_MOD_PATH=$out
-    make LLVM=1 modules_install
-    rm -rf $out/lib/modules/${rust-linux.version}/{build,source}
-  '';
-} // omitted
+} // omitted)

@@ -29,14 +29,19 @@
   in {
     packages = rec {
       configfile = pkgs.callPackage ./configfile.nix { inherit buildInputs nativeBuildInputs; };
-      buildRustKernelModules= pkgs.callPackage ./modules.nix {
+      buildRustKernelModules = pkgs.callPackage ./modules.nix {
         inherit buildInputs nativeBuildInputs configfile;
       };
       sampleRustMinimal = buildRustKernelModules {
+        modulePath = "samples/rust";
         extraConfig = ''
           SAMPLES y
           SAMPLES_RUST y
-          SAMPLE_RUST_MINIMAL y
+          SAMPLE_RUST_MINIMAL m
+        '';
+        installPhase = ''
+          mkdir -p $out
+          cp samples/rust/rust_minimal.ko $out
         '';
       };
     };
